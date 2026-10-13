@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<form name="newTracker"
+      formType="tablesDock"
+      dataType="br.com.rafilkl.newTracker"
+      title="Tracker"
+      theme="dark"
+      padding="{left=8, top=8, right=8, bottom=8}">
+
+    <script>
+        local trackerMain = require("trackerMain.lua");
+    </script>
+
+    <event name="onNodeReady"><![CDATA[
+        trackerMain.onNodeReady(self, sheet);
+    ]]></event>
+
+    <event name="onNodeUnready"><![CDATA[
+        trackerMain.onNodeUnready(self);
+    ]]></event>
+
+    <event name="onShow"><![CDATA[
+        trackerMain.onFormShow(self, sheet);
+    ]]></event>
+
+    <layout align="top" height="30" margins="{bottom=8}">
+        <button name="btnGrupo" align="left" width="72" text="Grupo">
+            <event name="onClick"><![CDATA[
+                trackerMain.openToolbarGroupMenu(self, sheet, self.btnGrupo);
+            ]]></event>
+        </button>
+
+        <button name="btnAdicionar" align="left" width="88" text="Items" margins="{left=4}">
+            <event name="onClick"><![CDATA[
+                trackerMain.openToolbarAddMenu(self, sheet, self.btnAdicionar);
+            ]]></event>
+        </button>
+
+        <button name="btnIniciativas" align="left" width="96" text="Iniciativas" margins="{left=8}">
+            <event name="onClick"><![CDATA[
+                trackerMain.openToolbarInitiativesMenu(self, sheet, self.btnIniciativas);
+            ]]></event>
+        </button>
+    </layout>
+
+    <rectangle align="top"
+               height="34"
+               color="#1A1F25"
+               strokeColor="#2F3945"
+               strokeSize="1"
+               xradius="4"
+               yradius="4"
+               margins="{bottom=6}"
+               padding="{left=4, top=4, right=4, bottom=4}">
+        <layout align="client">
+            <label align="left"
+                   width="28"
+                   text="vez"
+                   fontStyle="bold"
+                   fontSize="14"
+                   fontColor="#B8C7D6"
+                   horzTextAlign="center"
+                   vertTextAlign="center"/>
+            <label align="left"
+                   width="90"
+                   text="teste"
+                   margins="{left=6}"
+                   fontStyle="bold"
+                   fontSize="14"
+                   fontColor="#B8C7D6"
+                   horzTextAlign="center"
+                   vertTextAlign="center"/>
+            <label align="client"
+                   text="nome"
+                   margins="{left=6}"
+                   fontStyle="bold"
+                   fontSize="14"
+                   fontColor="#B8C7D6"
+                   horzTextAlign="center"
+                   vertTextAlign="center"/>
+            <label align="left"
+                   width="56"
+                   text="init"
+                   margins="{left=6, right=6}"
+                   fontStyle="bold"
+                   fontSize="14"
+                   fontColor="#B8C7D6"
+                   horzTextAlign="center"
+                   vertTextAlign="center"/>
+            <label align="right" width="26" text=""/>
+            <label align="right" width="26" text=""/>
+        </layout>
+    </rectangle>
+
+    <layout align="bottom" height="30" margins="{top=8}">
+        <button name="btnProximoTurno" align="left" width="112" text="Proximo Turno">
+            <event name="onClick"><![CDATA[
+                trackerMain.nextTurn(sheet);
+            ]]></event>
+        </button>
+
+        <label align="left" width="52" text="Rodada" margins="{left=8}"/>
+        <edit align="left" width="60" field="rodada" type="number" horzTextAlign="center"/>
+    </layout>
+
+    <recordList name="rclLista"
+                field="itens"
+                templateForm="frmTrackerItem"
+                align="client"
+                selectable="false">
+        <event name="onCompare"><![CDATA[
+            return trackerMain.compareListNodes(sheet, nodeA, nodeB);
+        ]]></event>
+    </recordList>
+</form>

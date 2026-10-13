@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module sdkVersion="3.7b">
+    <id>newTracker</id>
+    <version>2.1</version>
+    <info lang="pt-BR">
+        <name>newTracker</name>
+        <description>Plugin para Mesa do Rafilkl =)</description>
+        <author>RAFILKL</author>
+        <contact>https://github.com/RAFILKLDEV</contact>
+        <site>http://www.seu.site.com.br</site>
+    </info>
+</module>

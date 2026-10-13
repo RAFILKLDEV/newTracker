@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<popupForm name="frmTrackerItemMenu"
+           width="200"
+           height="136"
+           theme="dark"
+           drawContainer="false"
+           cancelable="true"
+           resizable="false"
+           movable="false"
+           placement="mouse">
+
+    <script>
+        local trackerMenu = require("trackerMenu.lua");
+    </script>
+
+    <button align="top" height="30" text="Rolar iniciativa" margins="{bottom=4}">
+        <event name="onClick"><![CDATA[
+            trackerMenu.rollInitiative(self, sheet);
+        ]]></event>
+    </button>
+
+    <button align="top" height="30" text="Grupo" margins="{bottom=4}">
+        <event name="onClick"><![CDATA[
+            trackerMenu.openGroupMenu(self, sheet);
+        ]]></event>
+    </button>
+
+    <button align="top" height="30" text="Cor" margins="{bottom=4}">
+        <event name="onClick"><![CDATA[
+            trackerMenu.openItemColorMenu(self, sheet);
+        ]]></event>
+    </button>
+
+    <button name="btnVisibilidade" align="top" height="30" text="Visibilidade"
+            visible="false" margins="{bottom=4}">
+        <event name="onClick"><![CDATA[
+            trackerMenu.changeVisibility(self, sheet);
+        ]]></event>
+    </button>
+
+    <button align="client" text="Temporario">
+        <event name="onClick"><![CDATA[
+            trackerMenu.openTemporaryMenu(self, sheet);
+        ]]></event>
+    </button>
+</popupForm>

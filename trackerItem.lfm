@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<form name="frmTrackerItem"
+      height="34"
+      theme="dark"
+      margins="{bottom=8}">
+
+    <script>
+        local trackerItem = require("trackerItem.lua");
+    </script>
+
+    <event name="onNodeReady"><![CDATA[
+        trackerItem.onNodeReady(self, sheet);
+    ]]></event>
+
+    <event name="onNodeUnready"><![CDATA[
+        trackerItem.onNodeUnready(self);
+    ]]></event>
+
+    <rectangle name="rectBg"
+               align="client"
+               color="#2A2A2A"
+               xradius="4"
+               yradius="4"
+               padding="{left=4, top=4, right=4, bottom=4}">
+        <event name="onMenu"><![CDATA[
+            trackerItem.openContextMenu(self, sheet);
+        ]]></event>
+        <event name="onStartDrag"><![CDATA[
+            trackerItem.onStartDrag(self, sheet, drag);
+        ]]></event>
+        <event name="onStartDrop"><![CDATA[
+            trackerItem.onStartDrop(self, sheet, drop);
+        ]]></event>
+
+        <layout name="layGrupo" align="client" visible="false">
+            <button align="right"
+                    width="26"
+                    text="X"
+                    onClick="trackerItem.onDeleteGroupClick(self, sheet);"/>
+
+            <checkBox align="left"
+                      width="62"
+                      text="Ativo"
+                      field="grupoAtivo">
+                <event name="onChange"><![CDATA[
+                    trackerItem.onGroupActiveChange(self, sheet);
+                ]]></event>
+            </checkBox>
+
+            <edit align="client"
+                  field="nomeGrupo"
+                  horzTextAlign="center"
+                  fontStyle="bold"
+                  fontSize="15"
+                  margins="{right=6}">
+                <event name="onMenu"><![CDATA[
+                    trackerItem.openContextMenu(self, sheet);
+                ]]></event>
+            </edit>
+        </layout>
+
+        <layout name="layItem" align="client" visible="true">
+            <layout align="top" height="26">
+                <rectangle name="rectTurn"
+                           align="left"
+                           width="28"
+                           color="#1B2F21"
+                           strokeColor="#3CA95B"
+                           strokeSize="1"
+                           xradius="4"
+                           yradius="4"
+                           onClick="trackerItem.onTurnClick(self, sheet);">
+                    <label name="lblTurnIndicator"
+                           align="client"
+                           text=">"
+                           fontStyle="bold"
+                           fontSize="15"
+                           fontColor="#63F28E"
+                           horzTextAlign="center"
+                           vertTextAlign="center"
+                           onClick="trackerItem.onTurnClick(self, sheet);"/>
+                </rectangle>
+
+                <edit name="edtTeste"
+                      align="left"
+                      width="90"
+                      field="teste"
+                      margins="{left=6}">
+                    <event name="onUserChange"><![CDATA[
+                        trackerItem.onFieldUserChange(sheet);
+                    ]]></event>
+                    <event name="onMenu"><![CDATA[
+                        trackerItem.openContextMenu(self, sheet);
+                    ]]></event>
+                </edit>
+
+                <edit name="edtNome"
+                      align="client"
+                      field="nome"
+                      margins="{left=6}">
+                    <event name="onUserChange"><![CDATA[
+                        trackerItem.onFieldUserChange(sheet);
+                    ]]></event>
+                    <event name="onMenu"><![CDATA[
+                        trackerItem.openContextMenu(self, sheet);
+                    ]]></event>
+                </edit>
+
+                <edit name="edtIniciativa"
+                      align="left"
+                      width="56"
+                      field="iniciativa"
+                      type="float"
+                      horzTextAlign="center"
+                      margins="{left=6, right=6}">
+                    <event name="onUserChange"><![CDATA[
+                        trackerItem.onFieldUserChange(sheet);
+                    ]]></event>
+                    <event name="onChange"><![CDATA[
+                        trackerItem.onInitChange(self);
+                    ]]></event>
+                    <event name="onMenu"><![CDATA[
+                        trackerItem.openContextMenu(self, sheet);
+                    ]]></event>
+                </edit>
+
+                <button name="btnFixar"
+                        align="right"
+                        width="26"
+                        text="📍"
+                        hint="Fixar posição"
+                        onClick="trackerItem.onPinClick(self, sheet);">
+                    <event name="onMenu"><![CDATA[
+                        trackerItem.openContextMenu(self, sheet);
+                    ]]></event>
+                </button>
+
+                <button align="right"
+                        width="26"
+                        text="X"
+                        onClick="trackerItem.onDeleteItemClick(sheet);">
+                    <event name="onMenu"><![CDATA[
+                        trackerItem.openContextMenu(self, sheet);
+                    ]]></event>
+                </button>
+            </layout>
+
+            <layout name="layTemp"
+                    align="top"
+                    height="0"
+                    visible="false"
+                    margins="{top=4}"/>
+        </layout>
+    </rectangle>
+</form>

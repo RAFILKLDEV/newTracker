@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<popupForm name="frmTrackerTemporaryMenu"
+           width="260"
+           height="360"
+           theme="dark"
+           drawContainer="false"
+           cancelable="true"
+           resizable="false"
+           movable="false"
+           placement="mouse">
+
+    <script>
+        local trackerTemporaryMenu = require("trackerTemporaryMenu.lua");
+    </script>
+
+    <event name="onNodeReady"><![CDATA[
+        trackerTemporaryMenu.onNodeReady(self, sheet);
+    ]]></event>
+
+    <event name="onNodeUnready"><![CDATA[
+        trackerTemporaryMenu.onNodeUnready(self);
+    ]]></event>
+
+    <layout align="top" height="30" margins="{bottom=6}">
+        <label align="left" width="54" text="Nome"/>
+        <edit name="edtNome" align="client"/>
+    </layout>
+
+    <layout align="top" height="30" margins="{bottom=4}">
+        <button align="left" width="28" text="1" onClick="trackerTemporaryMenu.apply(self, sheet, 1);"/>
+        <button align="left" width="28" text="2" margins="{left=4}" onClick="trackerTemporaryMenu.apply(self, sheet, 2);"/>
+        <button align="left" width="28" text="3" margins="{left=4}" onClick="trackerTemporaryMenu.apply(self, sheet, 3);"/>
+        <button align="left" width="28" text="4" margins="{left=4}" onClick="trackerTemporaryMenu.apply(self, sheet, 4);"/>
+        <button align="left" width="28" text="5" margins="{left=4}" onClick="trackerTemporaryMenu.apply(self, sheet, 5);"/>
+    </layout>
+
+    <layout align="top" height="30" margins="{bottom=8}">
+        <button align="left" width="28" text="6" onClick="trackerTemporaryMenu.apply(self, sheet, 6);"/>
+        <button align="left" width="28" text="7" margins="{left=4}" onClick="trackerTemporaryMenu.apply(self, sheet, 7);"/>
+        <button align="left" width="28" text="8" margins="{left=4}" onClick="trackerTemporaryMenu.apply(self, sheet, 8);"/>
+        <button align="left" width="28" text="9" margins="{left=4}" onClick="trackerTemporaryMenu.apply(self, sheet, 9);"/>
+    </layout>
+
+    <layout align="top" height="30">
+        <label align="left" width="54" text="Mais"/>
+        <edit name="edtQuantidade" align="left" width="80" type="number"/>
+        <button align="left" width="80" text="Aplicar" margins="{left=6}" onClick="trackerTemporaryMenu.applyCustom(self, sheet);"/>
+    </layout>
+
+    <label name="lblHistorico"
+           align="top"
+           height="24"
+           text="Historico"
+           fontStyle="bold"
+           margins="{top=10, bottom=4}"
+           visible="false"/>
+
+    <label name="lblSemHistorico"
+           align="top"
+           height="22"
+           text="Nenhuma condicao recente"
+           visible="false"/>
+
+    <scrollBox name="sbxHistorico"
+               align="client"
+               visible="false"/>
+</popupForm>
