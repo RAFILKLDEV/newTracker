@@ -2,6 +2,7 @@ local ndb = require("ndb.lua");
 local rrpg = require("rrpg.lua");
 local dialogs = require("dialogs.lua");
 local gui = require("gui.lua");
+local utils = require("utils.lua");
 local windowPositions = require("trackerWindowPositions.lua");
 local turnAccess = require("trackerTurnAccess.lua");
 local turnRequests = require("trackerTurnRequests.lua");
@@ -10,7 +11,10 @@ local M = {};
 local FLOATING_PADDING = 2;
 local FLOATING_GAP = 2;
 local TURN_TIMER_INTERVAL_MS = 1000;
+-- A receita validada do popup nao escreve left/top: isso estica o fundo nativo.
+local TURN_TIMER_SAVE_POSITION = false;
 local TURN_TIMER_POPUP_WIDTH = 200;
+local CONTEXT_MENU_WIDTH = 280;
 local TURN_TIMER_NAME_HEIGHT = 32;
 local TURN_TIMER_CLOCK_HEIGHT = 32;
 local TURN_TIMER_POPUP_HEIGHT = 2 * FLOATING_PADDING + TURN_TIMER_NAME_HEIGHT
@@ -31,6 +35,8 @@ local COLOR_SWATCH_SIZE = 22;
 local COLOR_SWATCH_SPACING = 4;
 local COLOR_SWATCH_COLUMNS = 8;
 local ATTENTION_POPUP_WIDTH = 200;
+local ATTENTION_DECAY_SECONDS = 3;
+local ATTENTION_ANIMATION_INTERVAL_MS = 50;
 local ATTENTION_BUTTON_WIDTH = 64;
 local ATTENTION_BUTTON_GAP = FLOATING_GAP;
 local ATTENTION_POPUP_PLACEMENT = "bottomLeft";
@@ -50,6 +56,8 @@ local ATTENTION_LIST_VIEWPORT_HEIGHT = ATTENTION_VISIBLE_ROWS * ATTENTION_ROW_HE
     + (ATTENTION_VISIBLE_ROWS - 1) * ATTENTION_ROW_SPACING;
 local ATTENTION_POPUP_HEIGHT = ATTENTION_CARD_VERTICAL_PADDING + ATTENTION_DRAG_HANDLE_HEIGHT
     + ATTENTION_HEADER_HEIGHT + ATTENTION_NAME_HEIGHT + 2 * FLOATING_GAP;
+local ATTENTION_POPUP_FIXED_HEIGHT = ATTENTION_POPUP_HEIGHT + FLOATING_GAP
+    + ATTENTION_LIST_VIEWPORT_HEIGHT;
 local GROUP_COLOR_OPTIONS = {
     {name = "Preto", color = "#1F1F1F"},
     {name = "Cinza", color = "#4D5A6A"},
@@ -78,6 +86,7 @@ local GROUP_COLOR_OPTIONS = {
 };
 local closePopup;
 local refreshFloatingRoot;
+local renderAttentionPopup;
 local getPlayerDisplayName;
 local getPinnedPosition;
 
@@ -504,14 +513,29 @@ local function clearLocalTurnTimerInterval(form)
 end
 
 local function applyFloatingPopupSize(popup, width, height)
-    local outerWidth = width;
-    local outerHeight = height;
+    local margin = popup._cardMargin or 0;
+    local outerWidth = width + 2 * margin;
+    local outerHeight = height + 2 * margin;
 
     if popup.width ~= outerWidth then
         popup.width = outerWidth;
     end
     if popup.height ~= outerHeight then
         popup.height = outerHeight;
+    end
+
+    if popup._cardMargin ~= nil then
+        -- Receita validada: so o tamanho da janela e o cartao deslocado.
+        -- Control size, tema e limites de largura alteram o fundo nativo.
+        local card = popup._fixedSizeCard;
+        if card ~= nil then
+            card.align = "none";
+            card.left = margin;
+            card.top = margin;
+            card.width = width;
+            card.height = height;
+        end
+        return;
     end
 
     if popup.minWidth ~= outerWidth then
@@ -551,7 +575,6 @@ local function applyLocalTurnTimerSize(form)
     local nameLabel = form._turnTimerNameLabel;
     local timerLabel = form._turnTimerLabel;
     local compact = form._turnTimerCompact == true;
-    local position = windowPositions.beginLayout(popup);
 
     popup:beginUpdate();
     applyFloatingPopupSize(popup,
@@ -592,8 +615,6 @@ local function applyLocalTurnTimerSize(form)
 
     popup:endUpdate();
     popup:needRepaint();
-
-    windowPositions.endLayout(popup, position);
 end
 
 local function destroyLocalTurnTimerContextPopup(contextMenu)
@@ -686,9 +707,7 @@ end
 
 local function createLocalTurnTimerPopup(form)
     local popup = gui.newPopupForm();
-    popup.theme = "dark";
-    popup.padding = {left = 0, top = 0, right = 0, bottom = 0};
-    popup.margins = {left = 0, top = 0, right = 0, bottom = 0};
+    popup._cardMargin = FLOATING_PADDING;
     applyFloatingPopupSize(popup, TURN_TIMER_POPUP_WIDTH, TURN_TIMER_POPUP_HEIGHT);
     popup.drawContainer = false;
     pcall(function()
@@ -713,12 +732,10 @@ local function createLocalTurnTimerPopup(form)
     local card = gui.newRectangle();
     card.parent = popup;
     card.align = "none";
-    card.left = 0;
-    card.top = 0;
+    card.left = FLOATING_PADDING;
+    card.top = FLOATING_PADDING;
     card.width = TURN_TIMER_POPUP_WIDTH;
     card.height = TURN_TIMER_POPUP_HEIGHT;
-    card.margins = {left = 0, top = 0, right = 0, bottom = 0};
-    card.padding = {left = 0, top = 0, right = 0, bottom = 0};
     popup._fixedSizeCard = card;
     card.color = "#181C21";
     card.strokeColor = "#63F28E";
@@ -919,21 +936,11 @@ local function syncLocalTurnTimer(form, root)
 
             return;
         end
-
-        popup._positionLayoutPending = true;
-        setTimeout(function()
-            local currentForm = sharedFloating.primaryForm or form;
-
-            if currentForm._activeTurnTimerPopup == popup and popup.isShowing == true then
-                local positionRoot = popup._positionLayoutRoot or root;
-                popup._positionLayoutPending = false;
-                applyLocalTurnTimerSize(currentForm);
-                windowPositions.bind(popup, positionRoot, "turn");
-            end
-        end, 1);
     end
 
-    windowPositions.bind(popup, root, "turn");
+    if TURN_TIMER_SAVE_POSITION then
+        windowPositions.bind(popup, root, "turn");
+    end
     if form._turnTimerIntervalId == nil then
         form._turnTimerIntervalId = setInterval(
             function()
@@ -1696,24 +1703,36 @@ local function configureAttentionPermissions(root)
     end
 end
 
-local function getAttentionEntries(root)
+local function getAttentionTimestamp(root)
+    if root ~= nil and ndb.getServerUTCTime ~= nil then
+        local days = tonumber(ndb.getServerUTCTime(root));
+        if days ~= nil and days > NDB_UNIX_EPOCH_OFFSET_DAYS then
+            return (days - NDB_UNIX_EPOCH_OFFSET_DAYS) * 86400;
+        end
+    end
+    return os.time();
+end
+
+local function getAttentionEntries(root, timestamp)
     local container = getAttentionContainer(root, false);
 
     if container == nil then
-        return {};
+        return {}, {};
     end
 
-    local byKey = {};
+    local byKey, counts = {}, {};
     local entries = {};
+    local now = timestamp or getAttentionTimestamp(root);
 
     for _, entry in ipairs(ndb.getChildNodes(container)) do
         local key = trimmed(entry.participanteId or entry.jogadorId or entry.id);
-        local count = math.max(0, math.floor(tonumber(entry.contagem) or 0));
+        local count = M.getAttentionCount(root, entry, now);
+        counts[entry] = count;
 
         if key ~= "" and count > 0 then
             local previous = byKey[key];
 
-            if previous == nil or count > (tonumber(previous.contagem) or 0) then
+            if previous == nil or count > (counts[previous] or 0) then
                 byKey[key] = entry;
             end
         end
@@ -1724,8 +1743,8 @@ local function getAttentionEntries(root)
     end
 
     table.sort(entries, function(a, b)
-        local countA = tonumber(a.contagem) or 0;
-        local countB = tonumber(b.contagem) or 0;
+        local countA = counts[a] or 0;
+        local countB = counts[b] or 0;
 
         if countA ~= countB then
             return countA > countB;
@@ -1734,21 +1753,60 @@ local function getAttentionEntries(root)
         return trimmed(a.nome):lower() < trimmed(b.nome):lower();
     end);
 
-    return entries;
+    return entries, counts;
+end
+
+-- Derive decay from server time. Every client sees the same charges without
+-- multiple clients racing to subtract from the shared node.
+function M.getAttentionCount(root, entry, now)
+    local count = math.max(0, math.floor(tonumber(entry.contagem) or 0));
+    now = now or getAttentionTimestamp(root);
+    local cycle = tonumber(entry.cargaCicloInicio);
+    local tick = tonumber(entry.cargaTick);
+    local elapsed;
+    if cycle ~= nil and tick ~= nil then
+        elapsed = math.max(0, math.floor((now - cycle) / ATTENTION_DECAY_SECONDS) - tick);
+    else
+        local requested = tonumber(entry.ultimaSolicitacao) or now;
+        elapsed = math.floor(math.max(0, now - requested) / ATTENTION_DECAY_SECONDS);
+    end
+    return math.max(0, count - elapsed);
 end
 
 local function getLocalAttentionKey(root)
     return getPlayerIdentity(getLocalPlayer(root));
 end
 
+local function attentionPlainName(value)
+    local text = trimmed(value);
+    local ok, plain = pcall(utils.removerFmtChat, text, false);
+    return ok and type(plain) == "string" and trimmed(plain) or text;
+end
+
 local function getLocalAttentionName(root)
     local player = getLocalPlayer(root);
-
-    if player ~= nil and getPlayerDisplayName ~= nil then
-        return trimmed(getPlayerDisplayName(player));
+    if player ~= nil then
+        local nick = attentionPlainName(player.nick);
+        if nick ~= "" then return nick; end
+        local login = trimmed(player.login);
+        if login ~= "" then return login; end
     end
-
     return "Jogador";
+end
+
+local function getAttentionDisplayName(entry, players)
+    local key = trimmed(entry.participanteId or entry.jogadorId or entry.id);
+    local player = players[key] or players[trimmed(entry.jogadorLogin):lower()];
+    local login = player ~= nil and trimmed(player.login) or "";
+    if login == "" then login = trimmed(entry.jogadorLogin); end
+    if login == "" and key ~= "local" and tonumber(key) == nil then login = key; end
+    local nick = attentionPlainName(entry.nome);
+    if not safeBoolean(entry.personalizado) and player ~= nil then
+        nick = attentionPlainName(player.nick);
+        if nick == "" then nick = login; end
+    end
+    if nick == "" then nick = login ~= "" and login or "Jogador"; end
+    return nick .. " - " .. (login ~= "" and login or "Jogador"), nick;
 end
 
 local function findAttentionEntry(root, key)
@@ -1770,15 +1828,18 @@ end
 local function ensureAttentionEntry(root, key, defaultName)
     configureAttentionPermissions(root);
     local entry = findAttentionEntry(root, key);
+    local player = getLocalPlayer(root);
+    local login = player ~= nil and trimmed(player.login) or "";
 
     if entry ~= nil then
         if not ndb.testPermission(entry, "write") then
             return nil;
         end
 
-        if trimmed(entry.nome) == "" then
+        if (trimmed(entry.nome) == "" or not safeBoolean(entry.personalizado)) and entry.nome ~= defaultName then
             entry.nome = defaultName;
         end
+        if login ~= "" and entry.jogadorLogin ~= login then entry.jogadorLogin = login; end
 
         return entry;
     end
@@ -1797,6 +1858,7 @@ local function ensureAttentionEntry(root, key, defaultName)
 
     entry.participanteId = tostring(key or "local");
     entry.jogadorId = tostring(key or "local");
+    entry.jogadorLogin = login;
     entry.nome = trimmed(defaultName) ~= "" and defaultName or "Jogador";
     entry.nomePadrao = entry.nome;
     entry.personalizado = false;
@@ -1817,8 +1879,20 @@ local function requestAttention(root)
         return;
     end
 
-    entry.contagem = math.max(0, math.floor(tonumber(entry.contagem) or 0)) + 1;
-    entry.ultimaSolicitacao = getCurrentTurnTimestamp(root);
+    local now = getAttentionTimestamp(root);
+    local count = M.getAttentionCount(root, entry, now);
+    local container = getAttentionContainer(root, false);
+    local cycle = tonumber(container.cicloInicio);
+    if cycle == nil or cycle > now or #getAttentionEntries(root) == 0 then
+        cycle = now;
+        container.cicloInicio = cycle;
+    end
+    ndb.beginUpdate(entry);
+    entry.contagem = count + 1;
+    entry.cargaCicloInicio = cycle;
+    entry.cargaTick = math.floor((now - cycle) / ATTENTION_DECAY_SECONDS);
+    entry.ultimaSolicitacao = now;
+    ndb.endUpdate(entry);
 end
 
 local function removeAttentionEntry(entry)
@@ -1859,7 +1933,7 @@ local function saveAttentionName(root, name)
         return;
     end
 
-    local cleanName = trimmed(name);
+    local cleanName = attentionPlainName(name);
 
     if cleanName == "" then
         cleanName = getLocalAttentionName(root);
@@ -1899,29 +1973,24 @@ local function setPopupTopmost(popup)
     end);
 end
 
--- O controle e a janela seguem a altura do conteudo mais o padding externo.
--- A posicao fica protegida enquanto o host aplica o novo tamanho.
-local function applyAttentionPopupSize(popup, height)
+-- A janela mantem altura fixa: redimensionar ou escrever left/top no host
+-- durante uma solicitacao de atencao altera o fundo e reposiciona o popup.
+local function applyAttentionPopupSize(popup)
     if popup == nil then
         return;
     end
 
-    local desiredHeight = math.max(ATTENTION_POPUP_HEIGHT,
-        tonumber(height) or tonumber(popup._attentionHeight) or ATTENTION_POPUP_HEIGHT);
-    popup._attentionHeight = desiredHeight;
-    if popup.width == ATTENTION_POPUP_WIDTH
-        and popup.height == desiredHeight
-        and gui.Control.getWidth(popup) == ATTENTION_POPUP_WIDTH
-        and gui.Control.getHeight(popup) == desiredHeight
-        and (popup._fixedSizeCard == nil or popup._fixedSizeCard.height == desiredHeight) then
+    local margin = popup._cardMargin or 0;
+    if popup.width == ATTENTION_POPUP_WIDTH + 2 * margin
+        and popup.height == ATTENTION_POPUP_FIXED_HEIGHT + 2 * margin
+        and (popup._fixedSizeCard == nil
+            or popup._fixedSizeCard.height == ATTENTION_POPUP_FIXED_HEIGHT) then
         return;
     end
-    local position = windowPositions.beginLayout(popup);
     popup:beginUpdate();
-    applyFloatingPopupSize(popup, ATTENTION_POPUP_WIDTH, desiredHeight);
+    applyFloatingPopupSize(popup, ATTENTION_POPUP_WIDTH, ATTENTION_POPUP_FIXED_HEIGHT);
     popup:endUpdate();
     popup:needRepaint();
-    windowPositions.endLayout(popup, position);
 end
 
 local function showAttentionPopup(popup)
@@ -1936,6 +2005,89 @@ local function showAttentionPopup(popup)
     local shown = gui.showPopup(popup, {placement = ATTENTION_POPUP_PLACEMENT});
 
     return shown;
+end
+
+function M.closeAttention(root)
+    if root == nil then return; end
+    if sharedFloating.attentionRequestedRoot == root then sharedFloating.attentionRequestedRoot = nil; end
+    windowPositions.set(root, "attentionClosed", true);
+    local popup = sharedFloating.attentionPopup;
+    if popup ~= nil and popup._attentionRoot == root then popup:close(); end
+end
+
+function M.openAttention(root)
+    if root == nil then return; end
+    sharedFloating.attentionRequestedRoot = root;
+    windowPositions.set(root, "attentionClosed", false);
+    renderAttentionPopup(root);
+end
+
+local function updateAttentionProgress(popup, now)
+    local track, fill = popup._attentionProgressTrack, popup._attentionProgressFill;
+    if track == nil or fill == nil then return nil; end
+    local cycle = popup._attentionProgressCycle;
+    local active = cycle ~= nil;
+    if track.visible ~= active then track.visible = active; end
+    if not active then return nil; end
+    local elapsed = math.max(0, now - cycle);
+    local tick = math.floor(elapsed / ATTENTION_DECAY_SECONDS);
+    local phase = (elapsed - tick * ATTENTION_DECAY_SECONDS) / ATTENTION_DECAY_SECONDS;
+    local width = math.max(0, math.min(track.width, math.floor(track.width * phase + 0.5)));
+    if fill.width ~= width then fill.width = width; end
+    if fill.visible ~= (width > 0) then fill.visible = width > 0; end
+    return tick;
+end
+
+local function setAttentionWatchRate(popup, active)
+    local watch = popup._attentionWatch;
+    if watch == nil then return; end
+    local interval = active and ATTENTION_ANIMATION_INTERVAL_MS or 1000;
+    if watch.intervalMs == interval then return; end
+    if watch.interval ~= nil then clearInterval(watch.interval); end
+    watch.intervalMs, watch.elapsedMs = interval, 0;
+    watch.interval = setInterval(watch.tick, interval);
+end
+
+local function stopAttentionWatch(popup)
+    local watch = popup._attentionWatch;
+    if watch == nil then return; end
+    popup._attentionWatch = nil;
+    if watch.interval ~= nil then clearInterval(watch.interval); end
+    if watch.pending ~= nil then clearTimeout(watch.pending); end
+    for _, id in ipairs(watch.listeners) do watch.observer:removeEventListener(id); end
+end
+
+local function watchAttention(popup, root)
+    local watch = popup._attentionWatch;
+    if watch ~= nil and watch.root == root then return; end
+    stopAttentionWatch(popup);
+    watch = {root = root, observer = ndb.newObserver(root), listeners = {}};
+    popup._attentionWatch = watch;
+    local function refresh()
+        if sharedFloating.attentionPopup == popup and popup._attentionWatch == watch then
+            renderAttentionPopup(root);
+        end
+    end
+    watch.tick = function()
+        if sharedFloating.attentionPopup ~= popup or popup._attentionWatch ~= watch
+            or popup.isShowing ~= true then return; end
+        if popup._attentionProgressCycle == nil then refresh(); return; end
+        local tick = updateAttentionProgress(popup, getAttentionTimestamp(root));
+        watch.elapsedMs = (watch.elapsedMs or 0) + watch.intervalMs;
+        -- Animate only the small fill. Rebuild rows at a charge boundary or
+        -- the existing one-second refresh, never for each animation frame.
+        if tick ~= watch.progressTick or watch.elapsedMs >= 1000 then
+            watch.progressTick, watch.elapsedMs = tick, 0;
+            refresh();
+        end
+    end;
+    local function changed()
+        if watch.pending ~= nil then return; end
+        watch.pending = setTimeout(function() watch.pending = nil; refresh(); end, 1);
+    end
+    for _, event in ipairs({"onDeepChanged", "onDeepChildAdded", "onDeepChildRemoved"}) do
+        watch.listeners[#watch.listeners + 1] = watch.observer:addEventListener(event, changed);
+    end
 end
 
 local function newAttentionIconButton(parent, pathData, color, hint, callback)
@@ -1968,11 +2120,8 @@ end
 
 local function createAttentionPopup(root)
     local popup = gui.newPopupForm();
-    popup.theme = "dark";
-    popup._dynamicCtrls = {};
+    popup._cardMargin = FLOATING_PADDING;
     popup._attentionRoot = root;
-    popup.padding = {left = 0, top = 0, right = 0, bottom = 0};
-    popup.margins = {left = 0, top = 0, right = 0, bottom = 0};
     applyAttentionPopupSize(popup);
     popup.drawContainer = false;
     pcall(function()
@@ -1983,17 +2132,16 @@ local function createAttentionPopup(root)
     popup.movable = true;
     popup.hitTest = false;
     popup.placement = ATTENTION_POPUP_PLACEMENT;
+    popup._dynamicCtrls = {};
     setPopupTopmost(popup);
 
     local card = gui.newRectangle();
     card.parent = popup;
     card.align = "none";
-    card.left = 0;
-    card.top = 0;
+    card.left = FLOATING_PADDING;
+    card.top = FLOATING_PADDING;
     card.width = ATTENTION_POPUP_WIDTH;
-    card.height = ATTENTION_POPUP_HEIGHT;
-    card.margins = {left = 0, top = 0, right = 0, bottom = 0};
-    card.padding = {left = 0, top = 0, right = 0, bottom = 0};
+    card.height = ATTENTION_POPUP_FIXED_HEIGHT;
     popup._fixedSizeCard = card;
     card.color = "#181C21";
     card.strokeColor = "#D7A84B";
@@ -2008,7 +2156,7 @@ local function createAttentionPopup(root)
     dragHandle.align = "none";
     dragHandle.left = FLOATING_PADDING;
     dragHandle.top = FLOATING_PADDING;
-    dragHandle.width = ATTENTION_POPUP_WIDTH - 2 * FLOATING_PADDING;
+    dragHandle.width = ATTENTION_POPUP_WIDTH - 2 * FLOATING_PADDING - 20;
     dragHandle.height = ATTENTION_DRAG_HANDLE_HEIGHT;
     dragHandle.text = "≡";
     dragHandle.hint = "Arraste para mover";
@@ -2023,6 +2171,14 @@ local function createAttentionPopup(root)
     -- Botões e edicao continuam capturando seus proprios cliques.
     dragHandle.hitTest = false;
 
+    local closeButton = gui.newButton();
+    closeButton.parent, closeButton.align = card, "none";
+    closeButton.left, closeButton.top = ATTENTION_POPUP_WIDTH - FLOATING_PADDING - 18, FLOATING_PADDING;
+    closeButton.width, closeButton.height = 18, ATTENTION_DRAG_HANDLE_HEIGHT;
+    closeButton.text, closeButton.fontSize, closeButton.hitTest = "×", 11, true;
+    closeButton.hint = "Fechar atenção neste cliente; reabrir pelos botões do chat";
+    closeButton.onClick = function() M.closeAttention(popup._attentionRoot); end;
+
     local header = gui.newLayout();
     header.parent = card;
     header.align = "none";
@@ -2035,7 +2191,7 @@ local function createAttentionPopup(root)
     local requestButton = newAttentionIconButton(header,
         "M12 2 L22 21 L2 21 Z M12 8 L12 14 M12 17 L12 18",
         "#FFD86A", "Solicitar atenção", function()
-            requestAttention(sharedFloating.activeRoot or root);
+            requestAttention(popup._attentionRoot);
         end);
     requestButton.left = 0;
 
@@ -2046,8 +2202,8 @@ local function createAttentionPopup(root)
     nameEdit.top = header.top + ATTENTION_HEADER_HEIGHT + FLOATING_GAP;
     nameEdit.width = ATTENTION_POPUP_WIDTH - 2 * FLOATING_PADDING;
     nameEdit.height = ATTENTION_NAME_HEIGHT;
-    nameEdit.textPrompt = "Nome";
-    nameEdit.hint = "Nome para a solicitação de atenção";
+    nameEdit.textPrompt = "Nick";
+    nameEdit.hint = "Apelido para a atenção; o login do jogador aparece ao lado na lista";
     nameEdit.fontSize = 11;
     nameEdit.fontColor = "#D8E0E8";
     nameEdit.transparent = true;
@@ -2056,7 +2212,7 @@ local function createAttentionPopup(root)
     local saveButton = newAttentionIconButton(header,
         "M3 3 L17 3 L21 7 L21 21 L3 21 Z M7 3 L7 9 L16 9 L16 3 M7 21 L7 14 L17 14 L17 21",
         "#D8E0E8", "Salvar nome", function()
-            local activeRoot = sharedFloating.activeRoot or root;
+            local activeRoot = popup._attentionRoot;
 
             if activeRoot ~= nil then
                 saveAttentionName(activeRoot, nameEdit.text);
@@ -2067,7 +2223,7 @@ local function createAttentionPopup(root)
     local clearButton = newAttentionIconButton(header,
         "M3 6 L21 6 M9 6 L9 3 L15 3 L15 6 M6 6 L7 21 L17 21 L18 6 M10 10 L10 17 M14 10 L14 17",
         "#D8E0E8", "Limpar", function()
-            local activeRoot = sharedFloating.activeRoot or root;
+            local activeRoot = popup._attentionRoot;
 
             if M.isMaster(activeRoot) then
                 clearAllAttention(activeRoot);
@@ -2078,18 +2234,33 @@ local function createAttentionPopup(root)
     clearButton.left = 2 * (ATTENTION_BUTTON_WIDTH + ATTENTION_BUTTON_GAP);
     sharedFloating.attentionClearButton = clearButton;
 
+    -- Use the existing gap below the name; the card and list keep their size.
+    local progressTrack = gui.newRectangle();
+    progressTrack.parent, progressTrack.align = card, "none";
+    progressTrack.left, progressTrack.top = FLOATING_PADDING, nameEdit.top + nameEdit.height;
+    progressTrack.width, progressTrack.height = ATTENTION_POPUP_WIDTH - 2 * FLOATING_PADDING, FLOATING_GAP;
+    progressTrack.color, progressTrack.strokeColor, progressTrack.strokeSize = "#3A424D", "transparent", 0;
+    progressTrack.hitTest, progressTrack.visible = false, false;
+    local progressFill = gui.newRectangle();
+    progressFill.parent, progressFill.align = progressTrack, "none";
+    progressFill.left, progressFill.top, progressFill.width, progressFill.height = 0, 0, 0, FLOATING_GAP;
+    progressFill.color, progressFill.strokeColor, progressFill.strokeSize = "#FFD86A", "transparent", 0;
+    progressFill.hitTest, progressFill.visible = false, false;
+    popup._attentionProgressTrack, popup._attentionProgressFill = progressTrack, progressFill;
+
     local listPanel = gui.newScrollBox();
     listPanel.parent = card;
     listPanel.align = "none";
     listPanel.left = FLOATING_PADDING;
     listPanel.top = nameEdit.top + nameEdit.height + FLOATING_GAP;
     listPanel.width = ATTENTION_POPUP_WIDTH - 2 * FLOATING_PADDING;
-    listPanel.height = 0;
+    listPanel.height = ATTENTION_LIST_VIEWPORT_HEIGHT;
     listPanel.visible = false;
     sharedFloating.attentionListPanel = listPanel;
     sharedFloating.attentionNameEdit = nameEdit;
 
     popup.onHide = function()
+        stopAttentionWatch(popup);
         windowPositions.stop(popup);
         if sharedFloating.attentionPopup == popup then
             sharedFloating.attentionPopup = nil;
@@ -2109,18 +2280,19 @@ local function createAttentionPopup(root)
     return popup;
 end
 
-local function renderAttentionPopup(root)
+renderAttentionPopup = function(root)
     if root == nil then
         return;
     end
+    if sharedFloating.attentionRequestedRoot ~= nil and sharedFloating.attentionRequestedRoot ~= root then return; end
 
     local popup = sharedFloating.attentionPopup;
-    local entries = getAttentionEntries(root);
-    local rowsHeight = #entries * ATTENTION_ROW_HEIGHT
-        + math.max(0, #entries - 1) * ATTENTION_ROW_SPACING;
-    local viewportHeight = math.min(rowsHeight, ATTENTION_LIST_VIEWPORT_HEIGHT);
-    local desiredHeight = ATTENTION_POPUP_HEIGHT
-        + (#entries > 0 and FLOATING_GAP + viewportHeight or 0);
+    if windowPositions.get(root, "attentionClosed") == true then
+        if popup ~= nil and popup._attentionRoot == root then popup:close(); end
+        return;
+    end
+    local now = getAttentionTimestamp(root);
+    local entries, counts = getAttentionEntries(root, now);
 
     if popup == nil then
         popup = createAttentionPopup(root);
@@ -2128,18 +2300,41 @@ local function renderAttentionPopup(root)
     end
 
     local listPanel = sharedFloating.attentionListPanel;
-    applyAttentionPopupSize(popup, desiredHeight);
     popup._attentionRoot = root;
+    watchAttention(popup, root);
+    local container = getAttentionContainer(root, false);
+    popup._attentionProgressCycle = #entries > 0 and
+        (tonumber(container ~= nil and container.cicloInicio)
+            or tonumber(entries[1].cargaCicloInicio) or tonumber(entries[1].ultimaSolicitacao)) or nil;
+    popup._attentionWatch.progressTick = updateAttentionProgress(popup, now);
+    setAttentionWatchRate(popup, popup._attentionProgressCycle ~= nil);
+    local localKey = getLocalAttentionKey(root);
+    local isMaster = M.isMaster(root);
+    local mesa = rrpg.getMesaDe(root);
+    local players, displayNames = {}, {};
+    for _, player in ipairs(mesa ~= nil and mesa.jogadores or {}) do
+        players[getPlayerIdentity(player)] = player;
+        local login = trimmed(player.login):lower();
+        if login ~= "" then players[login] = player; end
+    end
+    local signature = {localKey, tostring(isMaster), tostring(root)};
+    for _, entry in ipairs(entries) do
+        displayNames[entry] = getAttentionDisplayName(entry, players);
+        signature[#signature + 1] = tostring(entry) .. ":" .. tostring(counts[entry]) .. ":" .. displayNames[entry];
+    end
+    local ownEntry = findAttentionEntry(root, localKey);
+    local ownName = getLocalAttentionName(root);
+    if ownEntry ~= nil then local _, nick = getAttentionDisplayName(ownEntry, players); ownName = nick; end
+    signature[#signature + 1] = ownName;
+    signature = table.concat(signature, "\n");
+    if popup._attentionSignature == signature and popup.isShowing == true then return; end
+    popup._attentionSignature = signature;
 
     if listPanel ~= nil then
         listPanel:beginUpdate();
-        listPanel.height = viewportHeight;
         listPanel.visible = #entries > 0;
     end
     clearAttentionRows();
-
-    local localKey = getLocalAttentionKey(root);
-    local isMaster = M.isMaster(root);
 
     if listPanel ~= nil then
         for index, entry in ipairs(entries) do
@@ -2163,7 +2358,7 @@ local function renderAttentionPopup(root)
             rowBackground.yradius = 4;
             rowBackground.hitTest = false;
 
-            local count = math.max(1, math.floor(tonumber(entry.contagem) or 1));
+            local count = counts[entry];
             local fontSize = math.min(ATTENTION_MAX_FONT_SIZE,
                 ATTENTION_MIN_FONT_SIZE + math.floor(math.log(count + 1) / math.log(2)));
             local canRemove = isMaster or trimmed(entry.participanteId or entry.jogadorId or entry.id) == localKey;
@@ -2217,7 +2412,7 @@ local function renderAttentionPopup(root)
                 label.fontStyle = "bold";
             end
             label.fontColor = index == 1 and "#FFD86A" or "#D8E0E8";
-            label.text = trimmed(entry.nome) ~= "" and entry.nome or "???";
+            label.text = displayNames[entry];
             label.hint = string.format("%s — %dx", label.text, count);
             label.hitTest = true;
             label.horzTextAlign = "leading";
@@ -2230,11 +2425,8 @@ local function renderAttentionPopup(root)
     end
 
     if sharedFloating.attentionNameEdit ~= nil then
-        local ownEntry = findAttentionEntry(root, localKey);
         local nameEdit = sharedFloating.attentionNameEdit;
-        local savedName = ownEntry ~= nil
-            and tostring(ownEntry.nome or getLocalAttentionName(root))
-            or getLocalAttentionName(root);
+        local savedName = ownName;
 
         if nameEdit._attentionRoot ~= root or nameEdit._attentionSavedName == nil
             or nameEdit.text == nameEdit._attentionSavedName then
@@ -2263,6 +2455,7 @@ local function renderAttentionPopup(root)
             sharedFloating.attentionShowing = false;
 
             if popup.handle ~= nil and popup.handle ~= 0 then
+                stopAttentionWatch(popup);
                 clearAttentionRows();
                 clearPopupControls(popup);
                 popup:destroy();
@@ -2270,18 +2463,8 @@ local function renderAttentionPopup(root)
 
             return;
         end
-        popup._positionLayoutPending = true;
-        setTimeout(function()
-            if sharedFloating.attentionPopup == popup and popup.isShowing == true then
-                local positionRoot = popup._positionLayoutRoot or root;
-                popup._positionLayoutPending = false;
-                applyAttentionPopupSize(popup);
-                windowPositions.bind(popup, positionRoot, "attention");
-            end
-        end, 1);
     end
 
-    windowPositions.bind(popup, root, "attention");
     sharedFloating.attentionShowing = popup.isShowing == true;
 end
 
@@ -2429,6 +2612,7 @@ local function detachFloatingForm(form)
             end
 
             if not hasForm then
+                turnRequests.stop(root);
                 if record.turnRequestIntervalId ~= nil then
                     clearInterval(record.turnRequestIntervalId);
                     record.turnRequestIntervalId = nil;
@@ -2464,7 +2648,8 @@ local function detachFloatingForm(form)
     if not hasAnyForm then
         stopLocalTurnTimer(form);
 
-        if sharedFloating.attentionPopup ~= nil then
+        if sharedFloating.attentionPopup ~= nil
+            and sharedFloating.attentionRequestedRoot ~= sharedFloating.attentionPopup._attentionRoot then
             windowPositions.stop(sharedFloating.attentionPopup, true);
             sharedFloating.attentionPopup:close();
         end
@@ -2517,10 +2702,16 @@ refreshFloatingRoot = function(root)
 end
 
 function M.onNodeReady(form, sheet)
+    M.onNodeUnready(form);
     turnRequests.configure(sheet);
     configureAttentionPermissions(sheet);
+    if not M.isMaster(sheet) then
+        attachFloatingRoot(form, sheet);
+        return;
+    end
+    -- Somente o mestre inicializa/migra o estado compartilhado. Um jogador
+    -- nao pode gerar um turnTimerId local diferente do que esta no servidor.
     M.ensureRootDefaults(sheet);
-    M.onNodeUnready(form);
     local currentTurnItem = nil;
 
     for _, node in ipairs(M.getAllNodes(sheet)) do
@@ -2643,7 +2834,7 @@ local function showToolbarPopup(form, control, width, entries, placement)
 
     local popup = gui.newPopup();
     popup.parent = form;
-    popup.width = width or 180;
+    popup.width = math.max(CONTEXT_MENU_WIDTH, tonumber(width) or CONTEXT_MENU_WIDTH);
     popup.height = (#entries * (POPUP_ROW_HEIGHT + POPUP_ROW_SPACING)) + 4;
     popup.cancelable = true;
     popup.drawContainer = true;
@@ -2704,33 +2895,34 @@ function M.openTurnTimerContextMenu(form)
         or "Diminuir tamanho";
 
     local contextMenu = gui.newPopupForm();
-    contextMenu.theme = "dark";
-    contextMenu.padding = {left = 0, top = 0, right = 0, bottom = 0};
-    contextMenu.margins = {left = 0, top = 0, right = 0, bottom = 0};
+    contextMenu._cardMargin = FLOATING_PADDING;
     local contextHeight = 2 * FLOATING_PADDING + 2 * POPUP_ROW_HEIGHT + FLOATING_GAP;
-    applyFloatingPopupSize(contextMenu, TURN_TIMER_POPUP_WIDTH, contextHeight);
+    applyFloatingPopupSize(contextMenu, CONTEXT_MENU_WIDTH, contextHeight);
     contextMenu.drawContainer = false;
+    pcall(function()
+        contextMenu.backOpacity = 0;
+    end);
     contextMenu.cancelable = true;
     contextMenu.resizable = false;
     contextMenu.movable = false;
+    contextMenu.hitTest = false;
     contextMenu.placement = "mouse";
     contextMenu._dynamicCtrls = {};
 
     local card = gui.newRectangle();
     card.parent = contextMenu;
     card.align = "none";
-    card.left = 0;
-    card.top = 0;
-    card.width = TURN_TIMER_POPUP_WIDTH;
+    card.left = FLOATING_PADDING;
+    card.top = FLOATING_PADDING;
+    card.width = CONTEXT_MENU_WIDTH;
     card.height = contextHeight;
-    card.margins = {left = 0, top = 0, right = 0, bottom = 0};
-    card.padding = {left = 0, top = 0, right = 0, bottom = 0};
     contextMenu._fixedSizeCard = card;
     card.color = "#181C21";
     card.strokeColor = "#63F28E";
     card.strokeSize = 1;
     card.xradius = 5;
     card.yradius = 5;
+    card.hitTest = false;
     registerPopupControl(contextMenu, card);
 
     local btnDismiss = gui.newButton();
@@ -2738,7 +2930,7 @@ function M.openTurnTimerContextMenu(form)
     btnDismiss.align = "none";
     btnDismiss.left = FLOATING_PADDING;
     btnDismiss.top = FLOATING_PADDING;
-    btnDismiss.width = TURN_TIMER_POPUP_WIDTH - 2 * FLOATING_PADDING;
+    btnDismiss.width = CONTEXT_MENU_WIDTH - 2 * FLOATING_PADDING;
     btnDismiss.height = POPUP_ROW_HEIGHT;
     btnDismiss.text = "Fechar até o próximo turno";
     btnDismiss.onClick = function()
@@ -2755,7 +2947,7 @@ function M.openTurnTimerContextMenu(form)
     btnSize.align = "none";
     btnSize.left = FLOATING_PADDING;
     btnSize.top = FLOATING_PADDING + POPUP_ROW_HEIGHT + FLOATING_GAP;
-    btnSize.width = TURN_TIMER_POPUP_WIDTH - 2 * FLOATING_PADDING;
+    btnSize.width = CONTEXT_MENU_WIDTH - 2 * FLOATING_PADDING;
     btnSize.height = POPUP_ROW_HEIGHT;
     btnSize.text = sizeOptionText;
     btnSize.onClick = function()
@@ -2790,7 +2982,6 @@ function M.openTurnTimerContextMenu(form)
         return nil;
     end
 
-    applyFloatingPopupSize(contextMenu, TURN_TIMER_POPUP_WIDTH, contextHeight);
     return contextMenu;
 end
 
@@ -3392,14 +3583,22 @@ function M.nextTurn(root)
         local stateId = tostring(root.turnTimerId or "");
         if current == nil then return; end
         turnAccess.check(root, current, getLocalPlayer(root), function(allowed)
+            local trackerRecord = sharedFloating.roots[root];
+            if trackerRecord == nil or next(trackerRecord.forms) == nil then return; end
             if findCurrentTurnItem(root) ~= current
                 or tostring(root.turnTimerId or "") ~= stateId then return; end
             if allowed ~= true then
                 dialogs.alert("Você só pode passar o seu próprio turno ou o de uma ficha compartilhada com você.");
                 return;
             end
-            if turnRequests.request(root, current) ~= true then
-                dialogs.alert("Não foi possível solicitar a passagem do turno. O mestre precisa estar com o tracker aberto.");
+            local sent, reason = turnRequests.request(root, current, function(accepted, message)
+                local record = sharedFloating.roots[root];
+                if accepted ~= true and record ~= nil and next(record.forms) ~= nil then
+                    dialogs.alert(message or "Não foi possível confirmar a passagem do turno.");
+                end
+            end);
+            if sent ~= true then
+                dialogs.alert(reason or "Não foi possível solicitar a passagem do turno.");
             end
         end);
         return;

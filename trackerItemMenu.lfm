@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <popupForm name="frmTrackerItemMenu"
-           width="200"
-           height="136"
-           theme="dark"
+           width="284"
+           height="198"
            drawContainer="false"
            cancelable="true"
            resizable="false"
@@ -14,34 +13,42 @@
         local trackerMenu = require("trackerMenu.lua");
     </script>
 
-    <button align="top" height="30" text="Rolar iniciativa" margins="{bottom=4}">
+    <rectangle name="menuCard" align="none" left="2" top="2" width="280" height="194"
+               color="#181C21" strokeColor="#3B4654" strokeSize="1" xradius="5" yradius="5" hitTest="false">
+    <button name="btnRolar" align="none" left="2" width="276" height="30" fontSize="13" text="Rolar iniciativa">
         <event name="onClick"><![CDATA[
             trackerMenu.rollInitiative(self, sheet);
         ]]></event>
     </button>
 
-    <button align="top" height="30" text="Grupo" margins="{bottom=4}">
+    <button name="btnGrupo" align="none" left="2" width="276" height="30" fontSize="13" text="Grupo">
         <event name="onClick"><![CDATA[
             trackerMenu.openGroupMenu(self, sheet);
         ]]></event>
     </button>
 
-    <button align="top" height="30" text="Cor" margins="{bottom=4}">
+    <button name="btnCor" align="none" left="2" width="276" height="30" fontSize="13" text="Cor">
         <event name="onClick"><![CDATA[
             trackerMenu.openItemColorMenu(self, sheet);
         ]]></event>
     </button>
 
-    <button name="btnVisibilidade" align="top" height="30" text="Visibilidade"
-            visible="false" margins="{bottom=4}">
+    <button name="btnVisibilidade" align="none" left="2" width="276" height="30" fontSize="13" text="Visibilidade" visible="false">
         <event name="onClick"><![CDATA[
             trackerMenu.changeVisibility(self, sheet);
         ]]></event>
     </button>
 
-    <button align="client" text="Temporario">
+    <button name="btnFixar" align="none" left="2" width="276" height="30" fontSize="13" text="Fixar posição" visible="false">
+        <event name="onClick"><![CDATA[
+            trackerMenu.togglePin(self, sheet);
+        ]]></event>
+    </button>
+
+    <button name="btnTemporario" align="none" left="2" width="276" height="30" fontSize="13" text="Temporário">
         <event name="onClick"><![CDATA[
             trackerMenu.openTemporaryMenu(self, sheet);
         ]]></event>
     </button>
+    </rectangle>
 </popupForm>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<form name="frmTrackerChatMessage" height="80" theme="dark">
+    <script>
+        local chatView = require("trackerChatView.lua");
+    </script>
+    <event name="onNodeReady"><![CDATA[
+        chatView.mountMessage(self, sheet);
+    ]]></event>
+    <event name="onNodeUnready"><![CDATA[
+        chatView.unmountMessage(self);
+    ]]></event>
+    <event name="onResize"><![CDATA[
+        chatView.resizeMessage(self);
+    ]]></event>
+</form>

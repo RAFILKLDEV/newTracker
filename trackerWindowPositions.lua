@@ -10,7 +10,7 @@ local kinds = {"attention", "turn"};
 local fields = {
     "attentionLeft", "attentionTop", "attentionUpdatedAt",
     "turnLeft", "turnTop", "turnUpdatedAt",
-    "turnCompact", "turnCompactUpdatedAt"
+    "turnCompact", "turnCompactUpdatedAt", "attentionClosed", "attentionClosedUpdatedAt"
 };
 local allowedFields = {revision = true};
 for _, field in ipairs(fields) do allowedFields[field] = true; end
@@ -46,7 +46,7 @@ local function readSnapshot(fileName)
     local values = {};
     for key, value in text:gmatch("([%w]+)=([^\r\n]+)") do
         if allowedFields[key] then
-            if key == "turnCompact" then
+            if key == "turnCompact" or key == "attentionClosed" then
                 if value == "true" then values[key] = true;
                 elseif value == "false" then values[key] = false; end
             else
@@ -146,6 +146,11 @@ function M.ensure(root, onReady)
                 cache.turnCompact = node.turnCompact;
                 cache.turnCompactUpdatedAt = tonumber(node.turnCompactUpdatedAt) or 0;
             end
+            if node.attentionClosed ~= nil and (cache.attentionClosed == nil
+                or (tonumber(node.attentionClosedUpdatedAt) or 0) > (tonumber(cache.attentionClosedUpdatedAt) or 0)) then
+                cache.attentionClosed = node.attentionClosed;
+                cache.attentionClosedUpdatedAt = tonumber(node.attentionClosedUpdatedAt) or 0;
+            end
         end
         persist(record);
         record.ready = true;
@@ -179,6 +184,8 @@ function M.set(root, field, value)
     record.cache[field] = value;
     if field == "turnCompact" then
         record.cache.turnCompactUpdatedAt = nextRevision(record.cache.turnCompactUpdatedAt);
+    elseif field == "attentionClosed" then
+        record.cache.attentionClosedUpdatedAt = nextRevision(record.cache.attentionClosedUpdatedAt);
     end
     persist(record);
 end

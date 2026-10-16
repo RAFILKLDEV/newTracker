@@ -135,14 +135,6 @@ local function constructNew_frmTrackerItem()
     obj.edtIniciativa:setHorzTextAlign("center");
     obj.edtIniciativa:setMargins({left=6, right=6});
 
-    obj.btnFixar = GUI.fromHandle(_obj_newObject("button"));
-    obj.btnFixar:setParent(obj.layout1);
-    obj.btnFixar:setName("btnFixar");
-    obj.btnFixar:setAlign("right");
-    obj.btnFixar:setWidth(26);
-    obj.btnFixar:setText("📍");
-    obj.btnFixar:setHint("Fixar posição");
-
     obj.button2 = GUI.fromHandle(_obj_newObject("button"));
     obj.button2:setParent(obj.layout1);
     obj.button2:setAlign("right");
@@ -243,29 +235,17 @@ local function constructNew_frmTrackerItem()
             trackerItem.openContextMenu(self, sheet);
         end);
 
-    obj._e_event17 = obj.btnFixar:addEventListener("onClick",
-        function (event)
-            trackerItem.onPinClick(self, sheet);
-        end);
-
-    obj._e_event18 = obj.btnFixar:addEventListener("onMenu",
-        function (x, y, event)
-            trackerItem.openContextMenu(self, sheet);
-        end);
-
-    obj._e_event19 = obj.button2:addEventListener("onClick",
+    obj._e_event17 = obj.button2:addEventListener("onClick",
         function (event)
             trackerItem.onDeleteItemClick(sheet);
         end);
 
-    obj._e_event20 = obj.button2:addEventListener("onMenu",
+    obj._e_event18 = obj.button2:addEventListener("onMenu",
         function (x, y, event)
             trackerItem.openContextMenu(self, sheet);
         end);
 
     function obj:_releaseEvents()
-        __o_rrpgObjs.removeEventListenerById(self._e_event20);
-        __o_rrpgObjs.removeEventListenerById(self._e_event19);
         __o_rrpgObjs.removeEventListenerById(self._e_event18);
         __o_rrpgObjs.removeEventListenerById(self._e_event17);
         __o_rrpgObjs.removeEventListenerById(self._e_event16);
@@ -306,7 +286,6 @@ local function constructNew_frmTrackerItem()
         if self.edtNome ~= nil then self.edtNome:destroy(); self.edtNome = nil; end;
         if self.button1 ~= nil then self.button1:destroy(); self.button1 = nil; end;
         if self.lblTurnIndicator ~= nil then self.lblTurnIndicator:destroy(); self.lblTurnIndicator = nil; end;
-        if self.btnFixar ~= nil then self.btnFixar:destroy(); self.btnFixar = nil; end;
         if self.rectBg ~= nil then self.rectBg:destroy(); self.rectBg = nil; end;
         if self.edit1 ~= nil then self.edit1:destroy(); self.edit1 = nil; end;
         if self.layItem ~= nil then self.layItem:destroy(); self.layItem = nil; end;

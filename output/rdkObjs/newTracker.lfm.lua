@@ -35,6 +35,7 @@ local function constructNew_newTracker()
 
 
         local trackerMain = require("trackerMain.lua");
+        local trackerChat = require("trackerChat.lua");
     
 
 
@@ -192,16 +193,19 @@ local function constructNew_newTracker()
     obj._e_event0 = obj:addEventListener("onNodeReady",
         function ()
             trackerMain.onNodeReady(self, sheet);
+                    trackerChat.attach(self, sheet);
         end);
 
     obj._e_event1 = obj:addEventListener("onNodeUnready",
         function ()
-            trackerMain.onNodeUnready(self);
+            trackerChat.detach(self);
+                    trackerMain.onNodeUnready(self);
         end);
 
     obj._e_event2 = obj:addEventListener("onShow",
         function ()
             trackerMain.onFormShow(self, sheet);
+                    trackerChat.attach(self, sheet);
         end);
 
     obj._e_event3 = obj.btnGrupo:addEventListener("onClick",

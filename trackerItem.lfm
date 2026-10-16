@@ -125,17 +125,6 @@
                     ]]></event>
                 </edit>
 
-                <button name="btnFixar"
-                        align="right"
-                        width="26"
-                        text="📍"
-                        hint="Fixar posição"
-                        onClick="trackerItem.onPinClick(self, sheet);">
-                    <event name="onMenu"><![CDATA[
-                        trackerItem.openContextMenu(self, sheet);
-                    ]]></event>
-                </button>
-
                 <button align="right"
                         width="26"
                         text="X"

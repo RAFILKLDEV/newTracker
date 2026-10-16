@@ -27,9 +27,8 @@ local function constructNew_frmTrackerItemMenu()
     _gui_assignInitialParentForForm(obj.handle);
     obj:beginUpdate();
     obj:setName("frmTrackerItemMenu");
-    obj:setWidth(200);
-    obj:setHeight(136);
-    obj:setTheme("dark");
+    obj:setWidth(284);
+    obj:setHeight(198);
     obj:setDrawContainer(false);
     obj:setCancelable(true);
     obj:setResizable(false);
@@ -41,56 +40,94 @@ local function constructNew_frmTrackerItemMenu()
     
 
 
-    obj.button1 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button1:setParent(obj);
-    obj.button1:setAlign("top");
-    obj.button1:setHeight(30);
-    obj.button1:setText("Rolar iniciativa");
-    obj.button1:setMargins({bottom=4});
-    obj.button1:setName("button1");
+    obj.menuCard = GUI.fromHandle(_obj_newObject("rectangle"));
+    obj.menuCard:setParent(obj);
+    obj.menuCard:setName("menuCard");
+    obj.menuCard:setAlign("none");
+    obj.menuCard:setLeft(2);
+    obj.menuCard:setTop(2);
+    obj.menuCard:setWidth(280);
+    obj.menuCard:setHeight(194);
+    obj.menuCard:setColor("#181C21");
+    obj.menuCard:setStrokeColor("#3B4654");
+    obj.menuCard:setStrokeSize(1);
+    obj.menuCard:setXradius(5);
+    obj.menuCard:setYradius(5);
+    obj.menuCard:setHitTest(false);
 
-    obj.button2 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button2:setParent(obj);
-    obj.button2:setAlign("top");
-    obj.button2:setHeight(30);
-    obj.button2:setText("Grupo");
-    obj.button2:setMargins({bottom=4});
-    obj.button2:setName("button2");
+    obj.btnRolar = GUI.fromHandle(_obj_newObject("button"));
+    obj.btnRolar:setParent(obj.menuCard);
+    obj.btnRolar:setName("btnRolar");
+    obj.btnRolar:setAlign("none");
+    obj.btnRolar:setLeft(2);
+    obj.btnRolar:setWidth(276);
+    obj.btnRolar:setHeight(30);
+    obj.btnRolar:setFontSize(13);
+    obj.btnRolar:setText("Rolar iniciativa");
 
-    obj.button3 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button3:setParent(obj);
-    obj.button3:setAlign("top");
-    obj.button3:setHeight(30);
-    obj.button3:setText("Cor");
-    obj.button3:setMargins({bottom=4});
-    obj.button3:setName("button3");
+    obj.btnGrupo = GUI.fromHandle(_obj_newObject("button"));
+    obj.btnGrupo:setParent(obj.menuCard);
+    obj.btnGrupo:setName("btnGrupo");
+    obj.btnGrupo:setAlign("none");
+    obj.btnGrupo:setLeft(2);
+    obj.btnGrupo:setWidth(276);
+    obj.btnGrupo:setHeight(30);
+    obj.btnGrupo:setFontSize(13);
+    obj.btnGrupo:setText("Grupo");
+
+    obj.btnCor = GUI.fromHandle(_obj_newObject("button"));
+    obj.btnCor:setParent(obj.menuCard);
+    obj.btnCor:setName("btnCor");
+    obj.btnCor:setAlign("none");
+    obj.btnCor:setLeft(2);
+    obj.btnCor:setWidth(276);
+    obj.btnCor:setHeight(30);
+    obj.btnCor:setFontSize(13);
+    obj.btnCor:setText("Cor");
 
     obj.btnVisibilidade = GUI.fromHandle(_obj_newObject("button"));
-    obj.btnVisibilidade:setParent(obj);
+    obj.btnVisibilidade:setParent(obj.menuCard);
     obj.btnVisibilidade:setName("btnVisibilidade");
-    obj.btnVisibilidade:setAlign("top");
+    obj.btnVisibilidade:setAlign("none");
+    obj.btnVisibilidade:setLeft(2);
+    obj.btnVisibilidade:setWidth(276);
     obj.btnVisibilidade:setHeight(30);
+    obj.btnVisibilidade:setFontSize(13);
     obj.btnVisibilidade:setText("Visibilidade");
     obj.btnVisibilidade:setVisible(false);
-    obj.btnVisibilidade:setMargins({bottom=4});
 
-    obj.button4 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button4:setParent(obj);
-    obj.button4:setAlign("client");
-    obj.button4:setText("Temporario");
-    obj.button4:setName("button4");
+    obj.btnFixar = GUI.fromHandle(_obj_newObject("button"));
+    obj.btnFixar:setParent(obj.menuCard);
+    obj.btnFixar:setName("btnFixar");
+    obj.btnFixar:setAlign("none");
+    obj.btnFixar:setLeft(2);
+    obj.btnFixar:setWidth(276);
+    obj.btnFixar:setHeight(30);
+    obj.btnFixar:setFontSize(13);
+    obj.btnFixar:setText("Fixar posição");
+    obj.btnFixar:setVisible(false);
 
-    obj._e_event0 = obj.button1:addEventListener("onClick",
+    obj.btnTemporario = GUI.fromHandle(_obj_newObject("button"));
+    obj.btnTemporario:setParent(obj.menuCard);
+    obj.btnTemporario:setName("btnTemporario");
+    obj.btnTemporario:setAlign("none");
+    obj.btnTemporario:setLeft(2);
+    obj.btnTemporario:setWidth(276);
+    obj.btnTemporario:setHeight(30);
+    obj.btnTemporario:setFontSize(13);
+    obj.btnTemporario:setText("Temporário");
+
+    obj._e_event0 = obj.btnRolar:addEventListener("onClick",
         function (event)
             trackerMenu.rollInitiative(self, sheet);
         end);
 
-    obj._e_event1 = obj.button2:addEventListener("onClick",
+    obj._e_event1 = obj.btnGrupo:addEventListener("onClick",
         function (event)
             trackerMenu.openGroupMenu(self, sheet);
         end);
 
-    obj._e_event2 = obj.button3:addEventListener("onClick",
+    obj._e_event2 = obj.btnCor:addEventListener("onClick",
         function (event)
             trackerMenu.openItemColorMenu(self, sheet);
         end);
@@ -100,12 +137,18 @@ local function constructNew_frmTrackerItemMenu()
             trackerMenu.changeVisibility(self, sheet);
         end);
 
-    obj._e_event4 = obj.button4:addEventListener("onClick",
+    obj._e_event4 = obj.btnFixar:addEventListener("onClick",
+        function (event)
+            trackerMenu.togglePin(self, sheet);
+        end);
+
+    obj._e_event5 = obj.btnTemporario:addEventListener("onClick",
         function (event)
             trackerMenu.openTemporaryMenu(self, sheet);
         end);
 
     function obj:_releaseEvents()
+        __o_rrpgObjs.removeEventListenerById(self._e_event5);
         __o_rrpgObjs.removeEventListenerById(self._e_event4);
         __o_rrpgObjs.removeEventListenerById(self._e_event3);
         __o_rrpgObjs.removeEventListenerById(self._e_event2);
@@ -122,10 +165,12 @@ local function constructNew_frmTrackerItemMenu()
           self:setNodeDatabase(nil);
         end;
 
-        if self.button4 ~= nil then self.button4:destroy(); self.button4 = nil; end;
-        if self.button3 ~= nil then self.button3:destroy(); self.button3 = nil; end;
-        if self.button2 ~= nil then self.button2:destroy(); self.button2 = nil; end;
-        if self.button1 ~= nil then self.button1:destroy(); self.button1 = nil; end;
+        if self.btnRolar ~= nil then self.btnRolar:destroy(); self.btnRolar = nil; end;
+        if self.btnTemporario ~= nil then self.btnTemporario:destroy(); self.btnTemporario = nil; end;
+        if self.btnFixar ~= nil then self.btnFixar:destroy(); self.btnFixar = nil; end;
+        if self.btnGrupo ~= nil then self.btnGrupo:destroy(); self.btnGrupo = nil; end;
+        if self.menuCard ~= nil then self.menuCard:destroy(); self.menuCard = nil; end;
+        if self.btnCor ~= nil then self.btnCor:destroy(); self.btnCor = nil; end;
         if self.btnVisibilidade ~= nil then self.btnVisibilidade:destroy(); self.btnVisibilidade = nil; end;
         self:_oldLFMDestroy();
     end;

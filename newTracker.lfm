@@ -9,18 +9,22 @@
 
     <script>
         local trackerMain = require("trackerMain.lua");
+        local trackerChat = require("trackerChat.lua");
     </script>
 
     <event name="onNodeReady"><![CDATA[
         trackerMain.onNodeReady(self, sheet);
+        trackerChat.attach(self, sheet);
     ]]></event>
 
     <event name="onNodeUnready"><![CDATA[
+        trackerChat.detach(self);
         trackerMain.onNodeUnready(self);
     ]]></event>
 
     <event name="onShow"><![CDATA[
         trackerMain.onFormShow(self, sheet);
+        trackerChat.attach(self, sheet);
     ]]></event>
 
     <layout align="top" height="30" margins="{bottom=8}">

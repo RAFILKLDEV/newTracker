@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<form name="frmTrackerChatView" formType="tablesDock"
+      dataType="br.com.rafilkl.newTracker.chat" title="Chat Avançado"
+      theme="dark">
+    <script>
+        local trackerChat = require("trackerChat.lua");
+    </script>
+    <event name="onNodeReady"><![CDATA[
+        trackerChat.mount(self, sheet);
+    ]]></event>
+    <event name="onShow"><![CDATA[
+        trackerChat.mount(self, sheet);
+    ]]></event>
+    <event name="onNodeUnready"><![CDATA[
+        trackerChat.unmount(self);
+    ]]></event>
+    <event name="onHide"><![CDATA[
+        trackerChat.hide(self);
+    ]]></event>
+    <rectangle align="client" color="#242424" strokeSize="0" strokeColor="transparent"
+               padding="{left=28, top=12, right=12, bottom=10}">
+    <label name="statusLabel" align="bottom" height="0" fontSize="11" visible="false"
+           fontColor="#B8C3CE" wordWrap="true" textTrimming="none" vertTextAlign="leading"/>
+    <rectangle name="composerCard" align="bottom" height="124" color="#414141" strokeColor="transparent"
+               strokeSize="0" xradius="5" yradius="5" margins="{top=12}">
+        <layout name="composer" align="client" margins="{left=10, top=8, right=10, bottom=8}"/>
+    </rectangle>
+    <layout name="chatTools" align="top" height="24" margins="{left=10, right=10, bottom=6}"/>
+    <layout name="messageHost" align="client"/>
+    </rectangle>
+</form>

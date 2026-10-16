@@ -205,9 +205,7 @@ function M.openContextMenu(form, sheet)
     popup.scopeNode = sheet;
     popup.itemForm = form;
     require("trackerMenu.lua").configureItemMenu(popup, sheet);
-    if gui.showPopup(popup, {placement = "mouse"}) ~= false then
-        require("trackerMenu.lua").configureItemMenu(popup, sheet);
-    end
+    gui.showPopup(popup, {placement = "mouse"});
 end
 
 function M.updateVisual(form, sheet)
@@ -229,17 +227,7 @@ function M.updateVisual(form, sheet)
     end
 
     form.visible = true;
-    if form.btnFixar ~= nil then
-        form.btnFixar.visible = isMaster and not isGroup;
-    end
-
     if not isGroup then
-        if form.btnFixar ~= nil then
-            form.btnFixar.text = trackerMain.isItemPinned(sheet) and "📌" or "📍";
-            form.btnFixar.hint = trackerMain.isItemPinned(sheet)
-                and "Posição fixada" or "Fixar posição";
-        end
-
         if form.edtTeste ~= nil then
             form.edtTeste.readOnly = not isMaster or viewerVisibility == 1;
         end

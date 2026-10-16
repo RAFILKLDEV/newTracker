@@ -22,11 +22,31 @@ function M.configureItemMenu(popup, sheet)
             or (state == 1 and "Identidade oculta" or "Totalmente oculto");
     end
 
-    local height = canChangeVisibility and 170 or 136;
-    popup.width = 200;
-    popup.height = height;
-    gui.Control.setWidth(popup, 200);
-    gui.Control.setHeight(popup, height);
+    local pinButton = popup.btnFixar;
+    pinButton.visible = canChangeVisibility;
+    pinButton.text = trackerMain.isItemPinned(sheet) and "Desafixar posição" or "Fixar posição";
+    popup.hitTest = false;
+    local y = 2;
+    for _, name in ipairs({"btnRolar", "btnGrupo", "btnCor", "btnVisibilidade", "btnFixar", "btnTemporario"}) do
+        local button = popup[name];
+        if button.visible then
+            button.top, button.width, button.height = y, 276, 30;
+            y = y + 32;
+        end
+    end
+    popup.menuCard.height = y;
+    popup.width, popup.height = 284, y + 4;
+end
+
+function M.togglePin(popup, sheet)
+    local root = ndb.getRoot(sheet);
+    if root == nil or not trackerMain.isMaster(root) or trackerMain.isGroupNode(sheet) then return; end
+    trackerMain.toggleItemPin(sheet);
+    if popup.itemForm ~= nil then
+        require("trackerItem.lua").updateVisual(popup.itemForm, sheet);
+        trackerMain.redrawList(popup.itemForm);
+    end
+    popup:close();
 end
 
 function M.changeVisibility(popup, sheet)
@@ -89,25 +109,28 @@ function M.openGroupMenu(popup, sheet)
     end
 
     local menu = gui.newPopupForm();
-    menu.width = 190;
-    menu.height = 72 + (#availableGroups * 34);
-    menu.theme = "dark";
+    local cardHeight = 4 + (2 + #availableGroups) * 30 + (1 + #availableGroups) * 2;
+    menu.width, menu.height = 284, cardHeight + 4;
     menu.drawContainer = false;
     menu.cancelable = true;
     menu.resizable = false;
     menu.movable = false;
+    menu.hitTest = false;
     menu.placement = "mouse";
 
-    local layout = gui.newLayout();
+    local layout = gui.newRectangle();
     layout.parent = menu;
-    layout.align = "client";
+    layout.align = "none";
+    layout.left, layout.top, layout.width, layout.height = 2, 2, 280, cardHeight;
+    layout.color, layout.strokeColor, layout.strokeSize = "#181C21", "#3B4654", 1;
+    layout.xradius, layout.yradius, layout.hitTest = 5, 5, false;
 
     local btnCreate = gui.newButton();
     btnCreate.parent = layout;
-    btnCreate.align = "top";
+    btnCreate.align = "none";
+    btnCreate.left, btnCreate.top, btnCreate.width, btnCreate.fontSize = 2, 2, 276, 13;
     btnCreate.height = 30;
     btnCreate.text = "Criar grupo";
-    btnCreate.margins = {bottom = 4};
     btnCreate.onClick = function()
         menu:close();
         popup:close();
@@ -122,10 +145,10 @@ function M.openGroupMenu(popup, sheet)
 
     local btnNoGroup = gui.newButton();
     btnNoGroup.parent = layout;
-    btnNoGroup.align = "top";
+    btnNoGroup.align = "none";
+    btnNoGroup.left, btnNoGroup.top, btnNoGroup.width, btnNoGroup.fontSize = 2, 34, 276, 13;
     btnNoGroup.height = 30;
     btnNoGroup.text = "Sem grupo";
-    btnNoGroup.margins = {bottom = 4};
     btnNoGroup.onClick = function()
         trackerMain.moveItemToGroup(sheet, nil);
 
@@ -137,13 +160,13 @@ function M.openGroupMenu(popup, sheet)
         popup:close();
     end;
 
-    for _, group in ipairs(availableGroups) do
+    for index, group in ipairs(availableGroups) do
         local btnGroup = gui.newButton();
         btnGroup.parent = layout;
-        btnGroup.align = "top";
+        btnGroup.align = "none";
+        btnGroup.left, btnGroup.top, btnGroup.width, btnGroup.fontSize = 2, 66 + (index - 1) * 32, 276, 13;
         btnGroup.height = 30;
         btnGroup.text = tostring(group.nomeGrupo or "Grupo");
-        btnGroup.margins = {bottom = 4};
         btnGroup.onClick = function()
             trackerMain.moveItemToGroup(sheet, group);
 
